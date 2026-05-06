@@ -85,3 +85,24 @@ describe("OnelapClient.login", () => {
     );
   });
 });
+
+describe("OnelapClient auth guard", () => {
+  it("getActivities throws if not logged in", async () => {
+    const client = new OnelapClient();
+    await expect(client.getActivities()).rejects.toThrow("Not logged in");
+  });
+
+  it("getActivityDetail throws if not logged in", async () => {
+    const client = new OnelapClient();
+    await expect(client.getActivityDetail("abc")).rejects.toThrow(
+      "Not logged in"
+    );
+  });
+
+  it("downloadFit throws if not logged in", async () => {
+    const client = new OnelapClient();
+    await expect(
+      client.downloadFit("https://example.com/file.fit", "/tmp/test.fit")
+    ).rejects.toThrow("Not logged in");
+  });
+});

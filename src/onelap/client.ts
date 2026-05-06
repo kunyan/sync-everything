@@ -86,4 +86,34 @@ export class OnelapClient {
     this.xsrfToken = entry.token;
     this.oToken = entry.refresh_token;
   }
+
+  private assertLoggedIn(): void {
+    if (!this.uid || !this.xsrfToken || !this.oToken) {
+      throw new Error("Not logged in. Call login() first.");
+    }
+  }
+
+  private buildCookieHeader(): string {
+    return `ouid=${this.uid}; XSRF-TOKEN=${this.xsrfToken}; OTOKEN=${this.oToken}`;
+  }
+
+  async getActivities(): Promise<Activity[]> {
+    this.assertLoggedIn();
+    throw new Error("Not implemented");
+  }
+
+  async getTodayActivities(): Promise<Activity[]> {
+    this.assertLoggedIn();
+    throw new Error("Not implemented");
+  }
+
+  async getActivityDetail(activityId: string): Promise<ActivityDetail> {
+    this.assertLoggedIn();
+    throw new Error("Not implemented");
+  }
+
+  async downloadFit(downloadUrl: string, destPath: string): Promise<void> {
+    this.assertLoggedIn();
+    throw new Error("Not implemented");
+  }
 }
