@@ -40,4 +40,50 @@ export class OnelapClient {
   constructor(options?: OnelapClientOptions) {
     this.timeout = options?.timeout ?? 30_000;
   }
+
+  async login(username: string, password: string): Promise<void> {
+    if (!username || !password) {
+      throw new Error("username and password cannot be empty");
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const nonce = randomHex(16);
+    const passwordMd5 = md5Hex(password);
+    const sign = buildSignature({
+      account: username,
+      passwordMd5,
+      nonce,
+      timestamp,
+    });
+
+    const response = await fetch(`${LOGIN_BASE_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        nonce,
+        timestamp,
+        sign,
+      },
+      body: JSON.stringify({ account: username, password: passwordMd5 }),
+      signal: AbortSignal.timeout(this.timeout),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `Login failed with status ${response.status}: ${body}`
+      );
+    }
+
+    const result: LoginResponse = await response.json();
+
+    if (!result.data || result.data.length === 0) {
+      throw new Error("Invalid login response: no data");
+    }
+
+    const entry = result.data[0];
+    this.uid = String(entry.userinfo.uid);
+    this.xsrfToken = entry.token;
+    this.oToken = entry.refresh_token;
+  }
 }
