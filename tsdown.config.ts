@@ -15,4 +15,11 @@ export default defineConfig([
     clean: true,
     outDir: "dist/strava",
   },
+  {
+    entry: ["src/sync/index.ts"],
+    format: "esm",
+    dts: true,
+    clean: true,
+    outDir: "dist/sync",
+  },
 ]);
