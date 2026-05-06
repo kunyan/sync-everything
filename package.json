@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "type": "module",
-  "main": "index.js",
   "exports": {
     "./onelap": "./dist/onelap/index.mjs"
   },
