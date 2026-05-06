@@ -1,4 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import type {
   Activity,
   ActivityDetail,
@@ -160,6 +165,24 @@ export class OnelapClient {
 
   async downloadFit(downloadUrl: string, destPath: string): Promise<void> {
     this.assertLoggedIn();
-    throw new Error("Not implemented");
+
+    const response = await fetch(downloadUrl, {
+      signal: AbortSignal.timeout(this.timeout),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `Failed to download FIT file (${response.status}): ${body}`
+      );
+    }
+
+    if (!response.body) {
+      throw new Error("Response body is null");
+    }
+
+    await mkdir(dirname(destPath), { recursive: true });
+    const fileStream = createWriteStream(destPath);
+    await pipeline(Readable.fromWeb(response.body as any), fileStream);
   }
 }

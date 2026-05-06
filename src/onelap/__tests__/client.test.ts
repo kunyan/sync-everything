@@ -1,5 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { OnelapClient } from "../client.js";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 describe("OnelapClient.login", () => {
   beforeEach(() => {
@@ -305,5 +308,105 @@ describe("OnelapClient.getActivityDetail", () => {
 
     const lastCall = vi.mocked(globalThis.fetch).mock.calls.at(-1)!;
     expect(lastCall[0]).toBe("https://u.onelap.cn/analysis/detail/act-123");
+  });
+});
+
+describe("OnelapClient.downloadFit", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    tempDir = mkdtempSync(join(tmpdir(), "onelap-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("downloads file to specified path", async () => {
+    const client = await (async () => {
+      const c = new OnelapClient();
+      const mockLogin = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              token: "xsrf",
+              refresh_token: "otoken",
+              userinfo: { uid: 123 },
+            },
+          ],
+        }),
+      };
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockLogin as Response
+      );
+      await c.login("user", "pass");
+      return c;
+    })();
+
+    const fitContent = new Uint8Array([0x2e, 0x46, 0x49, 0x54]); // ".FIT"
+    const mockDownload = {
+      ok: true,
+      status: 200,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(fitContent);
+          controller.close();
+        },
+      }),
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockDownload as Response
+    );
+
+    const destPath = join(tempDir, "test.fit");
+    await client.downloadFit("https://example.com/file.fit", destPath);
+
+    expect(existsSync(destPath)).toBe(true);
+    const content = readFileSync(destPath);
+    expect(new Uint8Array(content)).toEqual(fitContent);
+  });
+
+  it("throws on non-OK response", async () => {
+    const client = await (async () => {
+      const c = new OnelapClient();
+      const mockLogin = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              token: "xsrf",
+              refresh_token: "otoken",
+              userinfo: { uid: 123 },
+            },
+          ],
+        }),
+      };
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockLogin as Response
+      );
+      await c.login("user", "pass");
+      return c;
+    })();
+
+    const mockFail = {
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      text: async () => "File not found",
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockFail as Response
+    );
+
+    const destPath = join(tempDir, "fail.fit");
+    await expect(
+      client.downloadFit("https://example.com/missing.fit", destPath)
+    ).rejects.toThrow("404");
   });
 });
