@@ -99,7 +99,23 @@ export class OnelapClient {
 
   async getActivities(): Promise<Activity[]> {
     this.assertLoggedIn();
-    throw new Error("Not implemented");
+
+    const response = await fetch(`${ANALYSIS_BASE_URL}/list`, {
+      headers: {
+        Cookie: this.buildCookieHeader(),
+      },
+      signal: AbortSignal.timeout(this.timeout),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `Failed to get activities (${response.status}): ${body}`
+      );
+    }
+
+    const result: ActivityListResponse = await response.json();
+    return result.data;
   }
 
   async getTodayActivities(): Promise<Activity[]> {

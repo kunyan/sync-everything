@@ -106,3 +106,73 @@ describe("OnelapClient auth guard", () => {
     ).rejects.toThrow("Not logged in");
   });
 });
+
+describe("OnelapClient.getActivities", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns activity list from API", async () => {
+    const client = await (async () => {
+      const c = new OnelapClient();
+      const mockLogin = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              token: "xsrf",
+              refresh_token: "otoken",
+              userinfo: { uid: 123 },
+            },
+          ],
+        }),
+      };
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockLogin as Response
+      );
+      await c.login("user", "pass");
+      return c;
+    })();
+
+    const mockActivities = {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            _id: "act-1",
+            id: 123,
+            fileKey: "key1",
+            date: "2026-05-06 10:30",
+            durl: "https://example.com/1.fit",
+          },
+          {
+            _id: "act-2",
+            id: 123,
+            fileKey: "key2",
+            date: "2026-05-05 08:00",
+            durl: "https://example.com/2.fit",
+          },
+        ],
+      }),
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockActivities as Response
+    );
+
+    const activities = await client.getActivities();
+    expect(activities).toHaveLength(2);
+    expect(activities[0]._id).toBe("act-1");
+    expect(activities[1].date).toBe("2026-05-05 08:00");
+
+    // Verify cookie header was sent
+    const lastCall = vi.mocked(globalThis.fetch).mock.calls.at(-1)!;
+    expect(lastCall[0]).toBe("https://u.onelap.cn/analysis/list");
+    const headers = lastCall[1]?.headers as Record<string, string>;
+    expect(headers["Cookie"]).toContain("ouid=123");
+    expect(headers["Cookie"]).toContain("XSRF-TOKEN=xsrf");
+    expect(headers["Cookie"]).toContain("OTOKEN=otoken");
+  });
+});
