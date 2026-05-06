@@ -253,3 +253,57 @@ describe("OnelapClient.getTodayActivities", () => {
     expect(activities.map((a) => a._id)).toEqual(["today-1", "yesterday-1"]);
   });
 });
+
+describe("OnelapClient.getActivityDetail", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fetches detail for a specific activity", async () => {
+    const client = await (async () => {
+      const c = new OnelapClient();
+      const mockLogin = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              token: "xsrf",
+              refresh_token: "otoken",
+              userinfo: { uid: 123 },
+            },
+          ],
+        }),
+      };
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockLogin as Response
+      );
+      await c.login("user", "pass");
+      return c;
+    })();
+
+    const mockDetail = {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          _id: "act-123",
+          duration: 3600,
+          distance: 25000,
+          avgPower: 200,
+        },
+      }),
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockDetail as Response
+    );
+
+    const detail = await client.getActivityDetail("act-123");
+    expect(detail._id).toBe("act-123");
+    expect(detail.duration).toBe(3600);
+
+    const lastCall = vi.mocked(globalThis.fetch).mock.calls.at(-1)!;
+    expect(lastCall[0]).toBe("https://u.onelap.cn/analysis/detail/act-123");
+  });
+});

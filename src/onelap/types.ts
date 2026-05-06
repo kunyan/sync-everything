@@ -27,6 +27,10 @@ export interface ActivityListResponse {
   data: Activity[];
 }
 
+export interface ActivityDetailResponse {
+  data: ActivityDetail;
+}
+
 export interface OnelapClientOptions {
   timeout?: number;
 }

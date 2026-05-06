@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type {
   Activity,
   ActivityDetail,
+  ActivityDetailResponse,
   ActivityListResponse,
   LoginResponse,
   OnelapClientOptions,
@@ -135,7 +136,26 @@ export class OnelapClient {
 
   async getActivityDetail(activityId: string): Promise<ActivityDetail> {
     this.assertLoggedIn();
-    throw new Error("Not implemented");
+
+    const response = await fetch(
+      `${ANALYSIS_BASE_URL}/detail/${activityId}`,
+      {
+        headers: {
+          Cookie: this.buildCookieHeader(),
+        },
+        signal: AbortSignal.timeout(this.timeout),
+      }
+    );
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `Failed to get activity detail (${response.status}): ${body}`
+      );
+    }
+
+    const result: ActivityDetailResponse = await response.json();
+    return result.data;
   }
 
   async downloadFit(downloadUrl: string, destPath: string): Promise<void> {
