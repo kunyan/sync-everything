@@ -11,11 +11,12 @@ import type {
   ActivityListResponse,
   LoginResponse,
   OnelapClientOptions,
+  TokenExchangeResponse,
 } from "./types.js";
 
 const ONELAP_SECRET = "REDACTED_USE_ENV_VAR";
 const LOGIN_BASE_URL = "https://www.onelap.cn/api";
-const ANALYSIS_BASE_URL = "https://u.onelap.cn/analysis";
+const OTM_BASE_URL = "https://otm.onelap.cn/api";
 
 export function md5Hex(input: string): string {
   return createHash("md5").update(input).digest("hex");
@@ -38,9 +39,7 @@ export function buildSignature(params: {
 }
 
 export class OnelapClient {
-  private uid: string | null = null;
-  private xsrfToken: string | null = null;
-  private oToken: string | null = null;
+  private sessionToken: string | null = null;
   private timeout: number;
 
   constructor(options?: OnelapClientOptions) {
@@ -62,7 +61,7 @@ export class OnelapClient {
       timestamp,
     });
 
-    const response = await fetch(`${LOGIN_BASE_URL}/login`, {
+    const loginResponse = await fetch(`${LOGIN_BASE_URL}/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,42 +73,64 @@ export class OnelapClient {
       signal: AbortSignal.timeout(this.timeout),
     });
 
-    if (!response.ok) {
-      const body = await response.text();
+    if (!loginResponse.ok) {
+      const body = await loginResponse.text();
       throw new Error(
-        `Login failed with status ${response.status}: ${body}`
+        `Login failed with status ${loginResponse.status}: ${body}`
       );
     }
 
-    const result: LoginResponse = await response.json();
+    const result: LoginResponse = await loginResponse.json();
 
     if (!result.data || result.data.length === 0) {
       throw new Error("Invalid login response: no data");
     }
 
-    const entry = result.data[0];
-    this.uid = String(entry.userinfo.uid);
-    this.xsrfToken = entry.token;
-    this.oToken = entry.refresh_token;
+    const refreshToken = result.data[0].refresh_token;
+
+    const tokenResponse = await fetch(`${OTM_BASE_URL}/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: refreshToken, from: "web", to: "web" }),
+      signal: AbortSignal.timeout(this.timeout),
+    });
+
+    if (!tokenResponse.ok) {
+      const body = await tokenResponse.text();
+      throw new Error(
+        `Token exchange failed with status ${tokenResponse.status}: ${body}`
+      );
+    }
+
+    const tokenResult: TokenExchangeResponse = await tokenResponse.json();
+
+    if (tokenResult.code !== 200) {
+      throw new Error(`Token exchange failed: ${tokenResult.error}`);
+    }
+
+    this.sessionToken = tokenResult.data.token;
   }
 
   private assertLoggedIn(): void {
-    if (!this.uid || !this.xsrfToken || !this.oToken) {
+    if (!this.sessionToken) {
       throw new Error("Not logged in. Call login() first.");
     }
   }
 
-  private buildCookieHeader(): string {
-    return `ouid=${this.uid}; XSRF-TOKEN=${this.xsrfToken}; OTOKEN=${this.oToken}`;
+  private authHeaders(): Record<string, string> {
+    return { Authorization: `Bearer ${this.sessionToken}` };
   }
 
   async getActivities(): Promise<Activity[]> {
     this.assertLoggedIn();
 
-    const response = await fetch(`${ANALYSIS_BASE_URL}/list`, {
+    const response = await fetch(`${OTM_BASE_URL}/otm/ride_record/list`, {
+      method: "POST",
       headers: {
-        Cookie: this.buildCookieHeader(),
+        ...this.authHeaders(),
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({}),
       signal: AbortSignal.timeout(this.timeout),
     });
 
@@ -121,7 +142,7 @@ export class OnelapClient {
     }
 
     const result: ActivityListResponse = await response.json();
-    return result.data;
+    return result.data.list;
   }
 
   async getTodayActivities(): Promise<Activity[]> {
@@ -133,8 +154,8 @@ export class OnelapClient {
       .slice(0, 10);
 
     return all.filter((activity) => {
-      if (activity.date.length < 10) return false;
-      const dateStr = activity.date.slice(0, 10);
+      const dateStr = activity.start_riding_time?.slice(0, 10);
+      if (!dateStr) return false;
       return dateStr === today || dateStr === yesterday;
     });
   }
@@ -143,11 +164,9 @@ export class OnelapClient {
     this.assertLoggedIn();
 
     const response = await fetch(
-      `${ANALYSIS_BASE_URL}/detail/${activityId}`,
+      `${OTM_BASE_URL}/otm/ride_record/analysis/${activityId}`,
       {
-        headers: {
-          Cookie: this.buildCookieHeader(),
-        },
+        headers: this.authHeaders(),
         signal: AbortSignal.timeout(this.timeout),
       }
     );
@@ -160,15 +179,20 @@ export class OnelapClient {
     }
 
     const result: ActivityDetailResponse = await response.json();
-    return result.data;
+    return result.data.ridingRecord;
   }
 
-  async downloadFit(downloadUrl: string, destPath: string): Promise<void> {
+  async downloadFit(fitUrl: string, destPath: string): Promise<void> {
     this.assertLoggedIn();
 
-    const response = await fetch(downloadUrl, {
-      signal: AbortSignal.timeout(this.timeout),
-    });
+    const encoded = Buffer.from(fitUrl).toString("base64");
+    const response = await fetch(
+      `${OTM_BASE_URL}/otm/ride_record/analysis/fit_content/${encoded}`,
+      {
+        headers: this.authHeaders(),
+        signal: AbortSignal.timeout(this.timeout),
+      }
+    );
 
     if (!response.ok) {
       const body = await response.text();
