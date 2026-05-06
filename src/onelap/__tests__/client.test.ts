@@ -176,3 +176,80 @@ describe("OnelapClient.getActivities", () => {
     expect(headers["Cookie"]).toContain("OTOKEN=otoken");
   });
 });
+
+describe("OnelapClient.getTodayActivities", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("filters activities to last 24 hours", async () => {
+    const client = await (async () => {
+      const c = new OnelapClient();
+      const mockLogin = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              token: "xsrf",
+              refresh_token: "otoken",
+              userinfo: { uid: 123 },
+            },
+          ],
+        }),
+      };
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockLogin as Response
+      );
+      await c.login("user", "pass");
+      return c;
+    })();
+
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const mockActivities = {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            _id: "today-1",
+            id: 123,
+            fileKey: "k1",
+            date: `${today} 10:30`,
+            durl: "https://example.com/1.fit",
+          },
+          {
+            _id: "yesterday-1",
+            id: 123,
+            fileKey: "k2",
+            date: `${yesterday} 08:00`,
+            durl: "https://example.com/2.fit",
+          },
+          {
+            _id: "old-1",
+            id: 123,
+            fileKey: "k3",
+            date: `${twoDaysAgo} 14:00`,
+            durl: "https://example.com/3.fit",
+          },
+        ],
+      }),
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockActivities as Response
+    );
+
+    const activities = await client.getTodayActivities();
+    expect(activities).toHaveLength(2);
+    expect(activities.map((a) => a._id)).toEqual(["today-1", "yesterday-1"]);
+  });
+});

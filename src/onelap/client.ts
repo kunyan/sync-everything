@@ -119,8 +119,18 @@ export class OnelapClient {
   }
 
   async getTodayActivities(): Promise<Activity[]> {
-    this.assertLoggedIn();
-    throw new Error("Not implemented");
+    const all = await this.getActivities();
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    return all.filter((activity) => {
+      if (activity.date.length < 10) return false;
+      const dateStr = activity.date.slice(0, 10);
+      return dateStr === today || dateStr === yesterday;
+    });
   }
 
   async getActivityDetail(activityId: string): Promise<ActivityDetail> {
