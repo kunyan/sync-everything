@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "exports": {
-    "./onelap": "./dist/onelap/index.js"
+    "./onelap": "./dist/onelap/index.mjs"
   },
   "scripts": {
     "build": "tsdown",
