@@ -38,7 +38,7 @@ async function createLoggedInClient(): Promise<OnelapClient> {
     .mockResolvedValueOnce(loginResp as Response)
     .mockResolvedValueOnce(tokenResp as Response);
 
-  const client = new OnelapClient();
+  const client = new OnelapClient({ secret: "test-secret" });
   await client.login("testuser", "testpass");
   return client;
 }
@@ -49,14 +49,14 @@ describe("OnelapClient.login", () => {
   });
 
   it("throws if username is empty", async () => {
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await expect(client.login("", "password")).rejects.toThrow(
       "username and password cannot be empty"
     );
   });
 
   it("throws if password is empty", async () => {
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await expect(client.login("user", "")).rejects.toThrow(
       "username and password cannot be empty"
     );
@@ -69,7 +69,7 @@ describe("OnelapClient.login", () => {
       .mockResolvedValueOnce(loginResp as Response)
       .mockResolvedValueOnce(tokenResp as Response);
 
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await client.login("testuser", "testpass");
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -100,7 +100,7 @@ describe("OnelapClient.login", () => {
       text: async () => "Invalid credentials",
     } as Response);
 
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await expect(client.login("user", "pass")).rejects.toThrow("401");
   });
 
@@ -111,26 +111,26 @@ describe("OnelapClient.login", () => {
       json: async () => ({ data: [] }),
     } as Response);
 
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await expect(client.login("user", "pass")).rejects.toThrow("no data");
   });
 });
 
 describe("OnelapClient auth guard", () => {
   it("getActivities throws if not logged in", async () => {
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await expect(client.getActivities()).rejects.toThrow("Not logged in");
   });
 
   it("getActivityDetail throws if not logged in", async () => {
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await expect(client.getActivityDetail("abc")).rejects.toThrow(
       "Not logged in"
     );
   });
 
   it("downloadFit throws if not logged in", async () => {
-    const client = new OnelapClient();
+    const client = new OnelapClient({ secret: "test-secret" });
     await expect(
       client.downloadFit("geo/some/file.fit", "/tmp/test.fit")
     ).rejects.toThrow("Not logged in");

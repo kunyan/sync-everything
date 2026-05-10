@@ -14,7 +14,6 @@ import type {
   TokenExchangeResponse,
 } from "./types.js";
 
-const ONELAP_SECRET = "REDACTED_USE_ENV_VAR";
 const LOGIN_BASE_URL = "https://www.onelap.cn/api";
 const OTM_BASE_URL = "https://otm.onelap.cn/api";
 
@@ -33,17 +32,23 @@ export function buildSignature(params: {
   passwordMd5: string;
   nonce: string;
   timestamp: string;
+  secret: string;
 }): string {
-  const signStr = `account=${params.account}&nonce=${params.nonce}&password=${params.passwordMd5}&timestamp=${params.timestamp}&key=${ONELAP_SECRET}`;
+  const signStr = `account=${params.account}&nonce=${params.nonce}&password=${params.passwordMd5}&timestamp=${params.timestamp}&key=${params.secret}`;
   return md5Hex(signStr);
 }
 
 export class OnelapClient {
   private sessionToken: string | null = null;
+  private secret: string;
   private timeout: number;
 
-  constructor(options?: OnelapClientOptions) {
-    this.timeout = options?.timeout ?? 30_000;
+  constructor(options: OnelapClientOptions) {
+    if (!options.secret) {
+      throw new Error("secret is required");
+    }
+    this.secret = options.secret;
+    this.timeout = options.timeout ?? 30_000;
   }
 
   async login(username: string, password: string): Promise<void> {
@@ -59,6 +64,7 @@ export class OnelapClient {
       passwordMd5,
       nonce,
       timestamp,
+      secret: this.secret,
     });
 
     const loginResponse = await fetch(`${LOGIN_BASE_URL}/login`, {

@@ -87,5 +87,6 @@ export interface ActivityDetailResponse {
 }
 
 export interface OnelapClientOptions {
+  secret: string;
   timeout?: number;
 }

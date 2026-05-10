@@ -25,14 +25,16 @@ describe("randomHex", () => {
 
 describe("buildSignature", () => {
   it("produces correct signature for known inputs", () => {
+    const fakeSecret = "test_secret_for_unit_tests";
     const sign = buildSignature({
       account: "testuser",
       passwordMd5: "482c811da5d5b4bc6d497ffa98491e38",
       nonce: "abcdef1234567890",
       timestamp: "1700000000",
+      secret: fakeSecret,
     });
     const expected = md5Hex(
-      "account=testuser&nonce=abcdef1234567890&password=482c811da5d5b4bc6d497ffa98491e38&timestamp=1700000000&key=REDACTED_USE_ENV_VAR"
+      `account=testuser&nonce=abcdef1234567890&password=482c811da5d5b4bc6d497ffa98491e38&timestamp=1700000000&key=${fakeSecret}`
     );
     expect(sign).toBe(expected);
   });

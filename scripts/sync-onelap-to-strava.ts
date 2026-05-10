@@ -4,7 +4,7 @@ import { StravaClient } from "../src/strava/index.js";
 import { syncOnelapToStrava } from "../src/sync/index.js";
 
 async function main() {
-  const onelapClient = new OnelapClient();
+  const onelapClient = new OnelapClient({ secret: process.env.ONELAP_SECRET! });
   await onelapClient.login(
     process.env.ONELAP_USERNAME!,
     process.env.ONELAP_PASSWORD!
